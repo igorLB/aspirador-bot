@@ -1,0 +1,9 @@
+users:
+  beltrano:
+    name: "Beltrano"
+    chatId: "123"
+    disable: false
+  fulano:
+    name: 'Fulano'
+    chatId: "123"
+    disable: true
