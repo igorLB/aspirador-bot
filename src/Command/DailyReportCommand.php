@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Domain\Craw\APInfoCraw;
 use App\Domain\Craw\DolcegustoCraw;
 use App\Entity\CurrencyRate;
 use Doctrine\ORM\EntityManagerInterface;
@@ -151,26 +152,27 @@ class DailyReportCommand extends Command
                     $this->sendMessage($user['chatId'], $finalMessage, 'html');
                 }
             }
+
+            if ($user['vagas_ti']) {
+                $apinfo = new APInfoCraw();
+                $vagas = $apinfo->getVagas($user['vagas_ti']);
+                $msg = "<b>Vagas!</b>\n\n";
+                if (empty($vagas)) {
+                    $msg .= "Desculpe, nenhuma vaga para o termo '${user['vagas_ti']}' foi encontrada entre ontem e hoje. ";
+                } else {
+                    foreach ($vagas as $vaga) {
+                        $msg .= "<b>Cargo: {$vaga['cargo']}</b>\n";
+                        $msg .= "Local: {$vaga['local']}\n";
+                        $msg .= "Empresa: {$vaga['empresa']}\n";
+                        $msg .= "Código: {$vaga['codigo']}\n\n";
+                    }
+                }
+                $this->sendMessage($user['chatId'], $msg, 'html');
+            }
         }
 
-
-        // ... put here the code to create the user
-
-        // this method must return an integer number with the "exit status code"
-        // of the command. You can also use these constants to make code more readable
-
-        // return this if there was no problem running the command
-        // (it's equivalent to returning int(0))
         $this->logger->info('Enviado com sucesso!');
         return Command::SUCCESS;
-
-        // or return this if some error happened during the execution
-        // (it's equivalent to returning int(1))
-        // return Command::FAILURE;
-
-        // or return this to indicate incorrect command usage; e.g. invalid options
-        // or missing arguments (it's equivalent to returning int(2))
-        // return Command::INVALID
     }
 
     public function getTecmundoNews(): array
@@ -220,7 +222,7 @@ class DailyReportCommand extends Command
             foreach ($config as $j => $answer) {
                 if (preg_match('/TRUE|VERDADEIRO|SIM|YES/i', $answer)) {
                     $final[$i][$j] = true;
-                } elseif (preg_match('/FALSE|FALSO|Nao|Não|No/i', $answer)) {
+                } elseif (preg_match('/FALSE|FALSO|Nao|Não|No/i', $answer) || empty($answer)) {
                     $final[$i][$j] = false;
                 }
             }
@@ -231,7 +233,10 @@ class DailyReportCommand extends Command
         foreach ($final as $i => $config) {
             $isDesabilitado = true;
             foreach ($config as $j => $answer) {
-                if ($j !== 'habilitado' && is_bool($answer) && $answer === true) {
+                if (
+                    ($j !== 'habilitado' && $answer === true)
+                    || !(is_bool($answer) && strlen($answer) > 1)
+                ) {
                     $isDesabilitado = false;
                     break;
                 }
@@ -240,7 +245,6 @@ class DailyReportCommand extends Command
                 $final[$i]['habilitado'] = false;
             }
         }
-
         return $final;
     }
 

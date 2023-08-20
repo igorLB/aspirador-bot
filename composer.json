@@ -21,7 +21,8 @@
         "php-webdriver/webdriver": "^1.14",
         "symfony/css-selector": "6.3.*",
         "symfony/dom-crawler": "6.3.*",
-        "symfony/http-client": "6.3.*"
+        "symfony/http-client": "6.3.*",
+        "voku/stringy": "~6.0"
     },
     "config": {
         "allow-plugins": {

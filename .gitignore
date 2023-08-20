@@ -12,3 +12,5 @@
 
 telegram-users.yml
 docker/database/pgdata
+run-tty.sh
+.idea

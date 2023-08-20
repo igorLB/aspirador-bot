@@ -14,10 +14,18 @@ class AbstractCraw
     {
         $chromeOptions = new ChromeOptions();
         $chromeOptions->addArguments([
+            "--no-sandbox",
             '--verbose',
             "--window-size=1200,1200",
             "--lang=pt",
+            "--disable-blink-features=AutomationControlled",
         ]);
+        $chromeOptions->setExperimentalOption("excludeSwitches", ["enable-automation"]);
+        $chromeOptions->setExperimentalOption('useAutomationExtension', false);
+        $chromeOptions->setExperimentalOption(
+            'prefs',
+            ['enable_referrers' => false, 'intl.accept_languages' => 'pt,pt-BR,en']
+        );
 
         $capabilities = DesiredCapabilities::chrome();
         $capabilities->setPlatform('Linux');
