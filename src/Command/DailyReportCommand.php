@@ -2,14 +2,15 @@
 
 namespace App\Command;
 
+use App\Domain\Craw\DolcegustoCraw;
 use App\Entity\CurrencyRate;
 use Doctrine\ORM\EntityManagerInterface;
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\RequestOptions;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -75,16 +76,33 @@ class DailyReportCommand extends Command
         }
 
 
+        $usersConfig = $this->getUserConfigs();
+        foreach ($users as $username => $user) {
+            foreach ($usersConfig as $userConfig) {
+                if ($username == $userConfig['username']) {
+                    $users[$username] = [...$users[$username], ...$userConfig];
+                }
+            }
+        }
+        foreach ($users as $username => $user) {
+            if (!array_key_exists('habilitado', $user)) {
+                unset($users[$username]);
+            }
+        }
+
         $today = new \DateTime();
 
         $query = $this->manager->createQuery(
             'SELECT cr
             FROM App\Entity\CurrencyRate cr
             WHERE cr.date >= :today
-            AND cr.currency = :currency'
+            AND cr.currency = :currency
+            ORDER BY cr.date DESC
+            '
         )
             ->setParameter('today', $today->format('Y-m-d 00:00:00'))
-            ->setParameter('currency', 'USD');
+            ->setParameter('currency', 'USD')
+            ->setMaxResults(1);
         $currencyRate = $query->getOneOrNullResult();
 
         if (empty($currencyRate)) {
@@ -103,15 +121,36 @@ class DailyReportCommand extends Command
         $newsMsg = $this->buildNewsMessage($news);
 
         foreach ($users as $user) {
-            if (array_key_exists('disable', $user) && $user['disable'] === true) {
+            if (array_key_exists('habilitado', $user) && $user['habilitado'] !== true) {
                 continue;
             }
 
-            $msg = "Hey *{$user['name']}*, bom dia!! \n\nO dolar hoje ({$today->format('d/m/Y')}) está: R$ *{$dollarPrice}*.";
+            $msg = "Hey *{$user['name']}*, bom dia!!";
             $this->sendMessage($user['chatId'], $msg, 'markdown');
 
-            $newsMsg = "<b>Aqui estão as notícias mais lidas do dia!</b> \n\n" . $newsMsg;
-            $this->sendMessage($user['chatId'], $newsMsg, 'html');
+            if ($user['cotacao_dollar']) {
+                $this->logger->info("Enviado Cotação do dollar para o usuário: " . $user['nome']);
+                $dollarMsg = "O dolar hoje ({$today->format('d/m/Y')}) está: R$ *{$dollarPrice}*.";
+                $this->sendMessage($user['chatId'], $dollarMsg, 'markdown');
+            }
+
+            if ($user['noticias_tecmundo']) {
+                $this->logger->info("Enviado as notíficas do tecmundo para o usuário: " . $user['nome']);
+                $newsMsg = "<b>Aqui estão as notícias mais lidas do dia!</b> \n\n" . $newsMsg;
+                $this->sendMessage($user['chatId'], $newsMsg, 'html');
+            }
+
+            if ($user['promocao_dolcegusto']) {
+                $this->logger->info("Buscando promos dolcegusto para o usuário: " . $user['nome']);
+                $saboresEmPromocao = $this->getDolcegustoPromocoes();
+                if (!empty($saboresEmPromocao)) {
+                    $finalMessage = "<b>Tem promoção de DolceGusto hoje!!!</b>\n\n";
+                    foreach ($saboresEmPromocao as $saborEmPromocao => $saborDetalhes) {
+                        $finalMessage .= "O sabor <b>{$saborEmPromocao}</b> atingiu a marca de " . number_format($saborDetalhes['value'], 2, ',', '.') . "! Clique no link para ver: <a href=\"" . $saborDetalhes['url'] . "\">LINK</a>\n\n";
+                    }
+                    $this->sendMessage($user['chatId'], $finalMessage, 'html');
+                }
+            }
         }
 
 
@@ -151,6 +190,58 @@ class DailyReportCommand extends Command
         $news = array_slice($news, 0, 8);
 
         return $news;
+    }
+
+    public function getDolcegustoPromocoes(): array
+    {
+        $craw = new DolcegustoCraw();
+        $saboresEmPromocao  = $craw->crawSaboresEmPromocao();
+        if (count($saboresEmPromocao) > 0) {
+            return $saboresEmPromocao;
+        }
+        return [];
+    }
+
+
+    public function getUserConfigs()
+    {
+        $configSheetUrl = $this->params->get('spreadsheet_url');
+        $handle = fopen($configSheetUrl, 'r');
+
+        $header = fgetcsv($handle, 1000, ',');
+
+        $final = [];
+        while (($data = fgetcsv($handle, 1000, ",")) !== false) {
+            $final[] = array_combine($header, $data);
+        }
+        fclose($handle);
+
+        foreach ($final as $i => $config) {
+            foreach ($config as $j => $answer) {
+                if (preg_match('/TRUE|VERDADEIRO|SIM|YES/i', $answer)) {
+                    $final[$i][$j] = true;
+                } elseif (preg_match('/FALSE|FALSO|Nao|Não|No/i', $answer)) {
+                    $final[$i][$j] = false;
+                }
+            }
+        }
+
+
+        # Se o usuário não tiver nenhuma skill habilitada, desabilita o usuário
+        foreach ($final as $i => $config) {
+            $isDesabilitado = true;
+            foreach ($config as $j => $answer) {
+                if ($j !== 'habilitado' && is_bool($answer) && $answer === true) {
+                    $isDesabilitado = false;
+                    break;
+                }
+            }
+            if ($isDesabilitado) {
+                $final[$i]['habilitado'] = false;
+            }
+        }
+
+        return $final;
     }
 
     public function buildNewsMessage(array $news): string

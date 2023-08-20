@@ -1,4 +1,4 @@
-# AspiradorBot 2.0
+# AspiradorBot 1.0.0
 
 ### Descrição
 Projetinho feito com Symfony 6 na sua versão de microsserviço.
@@ -9,6 +9,10 @@ Pega a cotação do dolar do dia corrente e as notícias mais lidas do TecMundo 
 
 Ex.:
 `docker run cedroigor/aspirador-bot bin/console app:daily-report`
+
+### Depedencias 
+- phpwebdriver
+
 
 ### Comandos úteis para desenvolvimento
 ##### Create or Edit An Entity
@@ -24,4 +28,13 @@ Ex.:
 `php bin/console make:entity --regenerate`
 
 ##### Run raw sql on terminal
-`php bin/console dbal:run-sql 'SELECT * FROM product'``
+`php bin/console dbal:run-sql 'SELECT * FROM product'`
+
+
+#### Create VAULT Key
+`php bin/console secrets:set DATABASE_PASSWORD`
+`APP_RUNTIME_ENV=prod php bin/console secrets:set DATABASE_PASSWORD`
+
+
+#### Show info logging
+`SHELL_VERBOSITY=2 bin/console app:daily-report`

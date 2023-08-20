@@ -50,16 +50,16 @@ WORKDIR /var/www/html
 
 ENV COMPOSER_ALLOW_SUPERUSER 1
 
-#COPY composer.json .
-#COPY composer.lock .
-#RUN composer install --no-scripts
+COPY composer.json .
+COPY composer.lock .
+RUN composer install --no-scripts
 
 ADD . .
 
 USER root
 
-#RUN composer dumpautoload --optimize
+RUN composer dumpautoload --optimize
 
 #ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-CMD ["bin/bash"]
+CMD ["SHELL_VERBOSITY=2", "php", "bin/console", "app:daily-report"]

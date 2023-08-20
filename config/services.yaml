@@ -6,6 +6,7 @@
 parameters:
     telegram.token: '%env(string:TELEGRAM_TOKEN)%'
     exchange_rate.token: '%env(string:EXCHANGE_RATE_TOKEN)%'
+    spreadsheet_url: '%env(string:SPREADSHEET_CONFIG_URL)%'
 
 services:
     # default configuration for services in *this* file
